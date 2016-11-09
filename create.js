@@ -32,7 +32,8 @@ module.exports = function(RED) {
         body: msg.payload
       };
 
-      client.create(params).then(function (resp) {
+      //change create(...) to index(...) for auto-id after ES V5.0
+      client.index(params).then(function (resp) {
         msg.payload = resp;
         node.send(msg);
       }, function (err) {
