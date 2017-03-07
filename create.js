@@ -1,18 +1,46 @@
 module.exports = function(RED) {
 
   var elasticsearch = require('elasticsearch');
+  
+  //reuse pooled client to avoid create too many tcp connection to es server
+  var esClientPool = function () {
+    var clients = {};
+    var obj = {
+      get: function (hosts) {
+        var id = hosts;
+        console.log("hosts", hosts);
+        if (!clients[id]) {
+          clients[id] = new elasticsearch.Client({
+            hosts: hosts.split(' ')
+            // timeout: timeout,
+            // requestTimeout: requestTimeout
+            // log: 'trace'
+          });
+          clients[id]._id = id;
+          clients[id]._nodeCount = 0;
+        }
+        clients[id]._nodeCount += 1;
+        return clients[id];
+      },
+      close: function (client) {
+        client._nodeCount -= 1;
+        if (client._nodeCount === 0) {
+          delete clients[client._id];
+        }
+      }
+    };
+    return obj;
+  }();
 
+  
   function Create(config) {
     RED.nodes.createNode(this,config);
     this.server = RED.nodes.getNode(config.server);
     var node = this;
     this.on('input', function(msg) {
+      //will get client from  pool
+      var client = esClientPool.get(node.server.host);
 
-      var client = new elasticsearch.Client({
-          hosts: node.server.host.split(' '),
-          timeout: node.server.timeout,
-          requestTimeout: node.server.reqtimeout
-      });
       var documentIndex = config.documentIndex;
       var documentType = config.documentType;
 
